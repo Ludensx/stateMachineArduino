@@ -45,7 +45,7 @@ unsigned long startMillis = 0;
 const long interval = 500; // Intervalo de parpadeo del LED en milisegundos
 bool ledState = false; // Estado actual del LED
 
-
+const int btn = 6;
 const int ledRed = 10;
 const int ledGreen = 9;
 const int ledBlue = 8;
@@ -137,12 +137,13 @@ void setup()
 {
 	Serial.begin(9600);
 
-  //lcd.begin(16, 2);
+  lcd.begin(16, 2);
 
 	Serial.println("Starting State Machine...");
 	setupStateMachine();	
 	Serial.println("Start Machine Started");
 
+  pinMode(boton,INPUT);
   pinMode(ledRed, OUTPUT);
   pinMode(ledGreen, OUTPUT);
   pinMode(ledBlue, OUTPUT);
@@ -252,10 +253,6 @@ void song() {
       }
     }
   }
-  // else{
-  //   stateMachine.SetState(SA, true, true);
-  //   band=false;
-  // }
 }
 void blinkLed() {
   unsigned long currentMillis = millis();
@@ -284,6 +281,29 @@ void contTo(int lim){
   }
 
 }
+void botonHandler(){
+  delay(100);
+  if(digitalRead(btn)==0){
+    band=false;
+    Serial.println(digitalRead(btn));
+  }
+}
+void menuConfig(){
+  digitalWrite(ledRed, 0);
+  digitalWrite(ledGreen, 0);
+  digitalWrite(ledBlue, 0);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Config--B");
+}
+void monitorAmbiental(){
+  digitalWrite(ledRed, 0);
+  digitalWrite(ledGreen, 0);
+  digitalWrite(ledBlue, 0);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Ambiente--C");
+}
 void outputA()
 {
 	Serial.println("A   B   C   D   E   F");
@@ -293,16 +313,32 @@ void outputA()
 }
 void outputB()
 {
+  band = true;
 	Serial.println("A   B   C   D   E   F");
 	Serial.println("    X                ");
 	Serial.println();
+  menuConfig(); //TODO
+  while(band){
+    botonHandler();
+    if(!band){
+      stateMachine.SetState(SC, true, true);
+    }
+  }
 }
 
 void outputC()
 {
+  band = true;
 	Serial.println("A   B   C   D   E   F");
 	Serial.println("        X    ");
 	Serial.println();
+  monitorAmbiental(); //TODO
+  while(band){
+    botonHandler();
+    if(!band){
+      stateMachine.SetState(SB, true, true);
+    }
+  }
 }
 
 void outputD()
@@ -311,10 +347,6 @@ void outputD()
 	Serial.println("            X");
 	Serial.println();
   while(band){
-    // if(curr - startMillis < 2000) {
-    //   stateMachine.SetState(SA, true, true);
-    //   band = false;
-    // }
     contTo(10);
     song();
     blinkLed();
