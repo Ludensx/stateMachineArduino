@@ -6,7 +6,8 @@ String pass = "1234";
 String contra = "";
 
 int cont = 0;
-int contE = 0;
+int contE = 0;//Contador para escribir
+int contWait = 0;//Contador para esperar
 
 bool seguridadB = true;
 
@@ -38,7 +39,9 @@ unsigned long previousMillis = 0;
 bool isPlaying = false;
 
 unsigned long previousLedMillis = 0;
+unsigned long prev = 0;
 //Led parpadeo
+unsigned long startMillis = 0;
 const long interval = 500; // Intervalo de parpadeo del LED en milisegundos
 bool ledState = false; // Estado actual del LED
 
@@ -248,10 +251,11 @@ void song() {
         isPlaying = false;
       }
     }
-  }else{
-    stateMachine.SetState(SA, true, true);
-    band=false;
   }
+  // else{
+  //   stateMachine.SetState(SA, true, true);
+  //   band=false;
+  // }
 }
 void blinkLed() {
   unsigned long currentMillis = millis();
@@ -267,6 +271,18 @@ void blinkLed() {
     // Cambiar el estado del LED
     ledState = !ledState;
   }
+}
+void contTo(int lim){
+  unsigned long curr = millis();
+  if(curr - prev >= 1000){
+    prev = curr;
+    Serial.println(contWait++);
+  }
+  if(contWait>=lim){
+    stateMachine.SetState(SA, true, true);
+    band=false;
+  }
+
 }
 void outputA()
 {
@@ -294,10 +310,15 @@ void outputD()
 	Serial.println("A   B   C   D   E   F");
 	Serial.println("            X");
 	Serial.println();
-  do{
+  while(band){
+    // if(curr - startMillis < 2000) {
+    //   stateMachine.SetState(SA, true, true);
+    //   band = false;
+    // }
+    contTo(10);
     song();
     blinkLed();
-  }while(band);
+  }
 }
 void outputE()
 {
