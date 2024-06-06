@@ -8,7 +8,7 @@ dht DHT;
 String pass = "1234";
 String contra = "";
 
-int cont = 0;
+int cont = 0;//Contador de intentos
 int contE = 0;//Contador para escribir
 int contWait = 0;//Contador para esperar
 
@@ -16,39 +16,63 @@ bool seguridadB = true;
 
 //Song
 bool band = true;
-#define NOTE_D4  294//
-#define NOTE_E4  330//
-#define NOTE_G4  392//
-#define NOTE_GS4 415//
-#define NOTE_A4  440//
-#define NOTE_AS4 466//
-#define NOTE_B4  494//
-#define NOTE_C5  523//
+#define NOTE_D4  294
+#define NOTE_E4  330
+#define NOTE_G4  392
+#define NOTE_GS4 415
+#define NOTE_A4  440
+#define NOTE_AS4 466
+#define NOTE_B4  494
+#define NOTE_C5  523
 #define REST      0
-int melody[] = {
-  //game over sound
-  NOTE_C5,-4, NOTE_G4,-4, NOTE_E4,4, //45
+
+#define NOTE_DS4 311
+#define NOTE_FS4 370
+
+int melodyBloq[] = {
+  NOTE_C5,-4, NOTE_G4,-4, NOTE_E4,4,
   NOTE_A4,-8, NOTE_B4,-8, NOTE_A4,-8, NOTE_GS4,-8, NOTE_AS4,-8, NOTE_GS4,-8,
   NOTE_G4,8, NOTE_D4,8, NOTE_E4,-2,  
 };
+int melodyAlarm[] = {
+  REST,8, NOTE_DS4,8,
+  NOTE_E4,-8, NOTE_FS4,8, NOTE_G4,-8, NOTE_C5,8, NOTE_B4,-8, NOTE_E4,8, NOTE_G4,-8, NOTE_B4,8, NOTE_AS4,2, 
+};
+//Bloqueo
 int tempo = 200;
-int notes = sizeof(melody) / sizeof(melody[0]) / 2;
+int notes = sizeof(melodyBloq) / sizeof(melodyBloq[0]) / 2;
 int wholenote = (60000 * 4) / tempo;
-int buzzer = 7; // Pin del buzzer
-
+int divider = 0;
 int thisNote = 0;
 unsigned long noteDuration = 0;
 unsigned long previousMillis = 0;
 bool isPlaying = false;
+//Alarma
+int tempoAlarm = 120;
+int notesAlarm = sizeof(melodyAlarm) / sizeof(melodyAlarm[0]) / 2;
+int wholenoteAlarm = (60000 * 4) / tempoAlarm;
+int dividerAlarm = 0;
+int thisNoteAlarm = 0;
+unsigned long noteDurationAlarm = 0;
+unsigned long previousMillisAlarm = 0;
+bool isPlayingAlarm = false;
+
+int buzzer = 7; // Pin del buzzer
+
+//Limites
+float limTemp = 25;
+float limLuz = 500;
+float limHall = 500;
 
 unsigned long previousLedMillis = 0;
+unsigned long prevAlarm = 0;
 unsigned long prevAmb = 0;
 unsigned long prevEv = 0;
 unsigned long prev = 0;
 //Led parpadeo
-unsigned long startMillis = 0;
-const long interval = 500; // Intervalo de parpadeo del LED en milisegundos
-bool ledState = false; // Estado actual del LED
+// unsigned long startMillis = 0;
+// const long interval = 500; // Intervalo de parpadeo del LED en milisegundos
+bool ledState = false; // Estado actual del LED de bloqueo
 
 const int btn = 6;
 const int ledRed = 53;
@@ -103,8 +127,7 @@ StateMachine stateMachine(6, 12);
 Input input;
 
 // Setup the State Machine
-void setupStateMachine()
-{
+void setupStateMachine(){
 	// Add transitions
 	stateMachine.AddTransition(SA, SB, []() { return input == claveCorrecta; });
 	stateMachine.AddTransition(SA, SD, []() { return input == sisBloqueado; });
@@ -140,8 +163,7 @@ void setupStateMachine()
 	stateMachine.SetOnLeaving(SF, []() {Serial.println("Leaving F"); });
 }
 
-void setup() 
-{
+void setup(){
 	Serial.begin(9600);
 
   lcd.begin(16, 2);
@@ -158,9 +180,7 @@ void setup()
 	// Initial state
 	stateMachine.SetState(SA, false, true);
 }
-
-void loop() 
-{
+void loop(){
 	input = static_cast<Input>(readInput());
 
 	stateMachine.Update();
@@ -189,7 +209,7 @@ int readInput(){
 void seguridad(){
   seguridadB=true;
   contra="";
-  contE=0;
+  contE = 0;
   cont = 0;
   while(seguridadB){
   digitalWrite(ledRed, 0);
@@ -235,11 +255,11 @@ void verificar(String contra){
     cont++;
   }
 }
-void song(){
+void songBloq(){
   unsigned long currentMillis = millis();
   if (thisNote < notes * 2) {
     if (!isPlaying) {
-      int divider = melody[thisNote + 1];
+      int divider = melodyBloq[thisNote + 1];
       if (divider > 0) {
         noteDuration = (wholenote) / divider;
       } else if (divider < 0) {
@@ -247,7 +267,7 @@ void song(){
         noteDuration *= 1.5;
       }
       
-      tone(buzzer, melody[thisNote], noteDuration * 0.9);
+      tone(buzzer, melodyBloq[thisNote], noteDuration * 0.9);
       previousMillis = currentMillis;
       isPlaying = true;
     } else {
@@ -259,19 +279,43 @@ void song(){
     }
   }
 }
-void blinkLed() {
+void blinkLed(int led, int interval){
   unsigned long currentMillis = millis();
 
   if (currentMillis - previousLedMillis >= interval) {
     previousLedMillis = currentMillis;
     // Si el LED está apagado, encenderlo y viceversa
     if (ledState) {
-      digitalWrite(ledRed, LOW);
+      digitalWrite(led, LOW);
     } else {
-      digitalWrite(ledRed, HIGH);
+      digitalWrite(led, HIGH);
     }
     // Cambiar el estado del LED
     ledState = !ledState;
+  }
+}
+void songAlarm(){
+  unsigned long currentMillisAlarm = millis();
+  if (thisNoteAlarm < notesAlarm * 2) {
+    if (!isPlayingAlarm) {
+      int dividerAlarm = melodyAlarm[thisNoteAlarm + 1];
+      if (dividerAlarm > 0) {
+        noteDurationAlarm = (wholenoteAlarm) / dividerAlarm;
+      } else if (dividerAlarm < 0) {
+        noteDurationAlarm = (wholenoteAlarm) / abs(dividerAlarm);
+        noteDurationAlarm *= 1.5;
+      }
+      
+      tone(buzzer, melodyAlarm[thisNoteAlarm], noteDurationAlarm * 0.9);
+      prevAlarm = currentMillisAlarm;
+      isPlayingAlarm = true;
+    } else {
+      if (currentMillisAlarm - prevAlarm >= noteDurationAlarm) {
+        noTone(buzzer);
+        thisNoteAlarm += 2;
+        isPlayingAlarm = false;
+      }
+    }
   }
 }
 void contTo(int lim, enum State estado){
@@ -284,13 +328,13 @@ void contTo(int lim, enum State estado){
     stateMachine.SetState(estado, true, true);
     band=false;
   }
-
 }
-void botonHandler(){
+void botonHandler(enum State estado){
   delay(100);
   if(digitalRead(btn)==0){
     band=false;
     Serial.println(digitalRead(btn));
+    stateMachine.SetState(estado, true, true);
   }
 }
 void menuConfig(){
@@ -358,8 +402,24 @@ void monitorEventos(){
     readHall();
   }
 }
-void outputA()
-{
+void alarmLcd(){
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Alarm");
+}
+bool alarmTemp(){
+  if(DHT.temperature > limTemp) return true;
+  else return false;
+}
+bool alarmLuz(){
+  if(analogRead(ldr) > limLuz) return true;
+  else return false;
+}
+bool alarmHall(){
+  if(analogRead(hallP) > limHall) return true;
+  else return false;
+}
+void outputA(){
 	Serial.println("A   B   C   D   E   F");
 	Serial.println("X            ");
 	Serial.println();
@@ -372,10 +432,7 @@ void outputB(){
 	Serial.println();
   menuConfig(); //TODO
   while(band){
-    botonHandler();
-    if(!band){
-      stateMachine.SetState(SC, true, true);
-    }
+    botonHandler(SC);
   }
 }
 void outputC(){
@@ -385,30 +442,39 @@ void outputC(){
 	Serial.println("        X    ");
 	Serial.println();
   while(band){
-    if(!band){
-      stateMachine.SetState(SB, true, true);
-    }
+    if(alarmTemp() && alarmLuz()) stateMachine.SetState(Se, true, true);
     monitorAmbiental();
-    botonHandler();
+    botonHandler(SB);
     contTo(7, SF);
   }
 }
 void outputD(){
   contWait = 0;
   thisNote = 0;
+  band = true;
 	Serial.println("A   B   C   D   E   F");
 	Serial.println("            X");
 	Serial.println();
   while(band){
     contTo(10, SA);
-    song();
-    blinkLed();
+    songBloq();
+    blinkLed(ledRed, 500);
   }
 }
 void outputE(){
+  contWait = 0;
+  thisNoteAlarm = 0;
+  band = true;
 	Serial.println("A   B   C   D   E   F");
 	Serial.println("                X");
 	Serial.println();
+  alarmLcd();
+  while(band){
+    contTo(4, SC);
+    botonHandler(SA);
+    songAlarm();
+    blinkLed(ledBlue, 800);
+  }
 }
 void outputF(){
   band = true;
@@ -417,11 +483,9 @@ void outputF(){
 	Serial.println("                    X");
 	Serial.println();
   while(band){
-    if(!band){
-      stateMachine.SetState(SB, true, true);
-    }
+    if(alarmHall()) stateMachine.SetState(Se, true, true);
     monitorEventos();
-    botonHandler();
-    contTo(3, SC);
+    botonHandler(SB);
+    contTo(5, SC);
   }
 }
