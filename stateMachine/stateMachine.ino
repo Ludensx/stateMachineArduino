@@ -13,6 +13,7 @@ int contE = 0;//Contador para escribir
 int contWait = 0;//Contador para esperar
 
 bool seguridadB = true;
+bool conf = true;
 
 //Song
 bool band = true;
@@ -48,7 +49,7 @@ unsigned long noteDuration = 0;
 unsigned long previousMillis = 0;
 bool isPlaying = false;
 //Alarma
-int tempoAlarm = 120;
+int tempoAlarm = 200;
 int notesAlarm = sizeof(melodyAlarm) / sizeof(melodyAlarm[0]) / 2;
 int wholenoteAlarm = (60000 * 4) / tempoAlarm;
 int dividerAlarm = 0;
@@ -60,9 +61,14 @@ bool isPlayingAlarm = false;
 int buzzer = 7; // Pin del buzzer
 
 //Limites
-float limTemp = 25;
-float limLuz = 500;
-float limHall = 500;
+float limT = 25;
+float limL = 500;
+float limH = 500;
+
+const char up = '2', down = '5', left = '4', rigth = '6';
+const char enter = '*';
+
+char op = 'T';
 
 unsigned long previousLedMillis = 0;
 unsigned long prevAlarm = 0;
@@ -91,8 +97,8 @@ char keys[ROWS][COLS] = {
 };
 byte rowPins[ROWS] = {21, 20, 19, 18};
 byte colPins[COLS] = {17, 16, 15, 14};
-
 Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
+
 const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
@@ -252,6 +258,7 @@ void verificar(String contra){
     Serial.println("Incorrecta");
     lcd.print("Incorrecta");
     digitalWrite(ledBlue, 255);
+    contE = 0;
     cont++;
   }
 }
@@ -337,14 +344,6 @@ void botonHandler(enum State estado){
     stateMachine.SetState(estado, true, true);
   }
 }
-void menuConfig(){
-  digitalWrite(ledRed, 0);
-  digitalWrite(ledGreen, 0);
-  digitalWrite(ledBlue, 0);
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Config--B");
-}
 void readTemp(){
   Serial.print("Temp: ");
   Serial.println(DHT.temperature);
@@ -408,16 +407,147 @@ void alarmLcd(){
   lcd.print("Alarm");
 }
 bool alarmTemp(){
-  if(DHT.temperature > limTemp) return true;
+  if(DHT.temperature > limT) return true;
   else return false;
 }
 bool alarmLuz(){
-  if(analogRead(ldr) > limLuz) return true;
+  if(analogRead(ldr) > limL) return true;
   else return false;
 }
 bool alarmHall(){
-  if(analogRead(hallP) > limHall) return true;
+  if(analogRead(hallP) > limH) return true;
   else return false;
+}
+void printMenu(){
+  lcd.setCursor(2, 0);
+  lcd.print("Temp");
+  lcd.setCursor(9, 0);
+  lcd.print("Luz");
+  lcd.setCursor(2, 1);
+  lcd.print("Hall");
+}
+void selectOp(){
+  char key = keypad.getKey();
+  if(key){
+    switch(key){
+      case up:
+        //op = 'T';
+        lcd.clear();
+        printMenu();
+        op = selTemp();
+      break;
+      case down:
+        //if(op == 'T' || op == 'L') op = 'H';
+        lcd.clear();
+        printMenu();
+        op = selHall();
+      break;
+      case left:
+        //if(op == 'L') op = 'T';
+        lcd.clear();
+        printMenu();
+        op = selTemp();
+      break;
+      case rigth:
+        //if(op == 'T') op = 'L';
+        lcd.clear();
+        printMenu();
+        op = selLuz();
+      break;
+      case enter:
+        lcd.clear();
+        menuConfig(op);
+      break;
+    }
+  }
+}
+char selTemp(){
+  lcd.setCursor(1, 0);
+  lcd.print("*");
+  return('T');
+}
+char selLuz(){
+  lcd.setCursor(8, 0);
+  lcd.print("*");
+  return('L');
+}
+char selHall(){
+  lcd.setCursor(1, 1);
+  lcd.print("*");
+  return('H');
+}
+void menuConfig(char op){
+  lcd.clear();
+  conf = true;
+  while(conf){
+    char key = keypad.getKey();
+    lcd.setCursor(0,0);
+    lcd.print("Config");
+    switch(op){
+      case 'T':
+        lcd.setCursor(7,0);
+        lcd.print("Temp");
+        lcd.setCursor(0, 1);
+        lcd.print(limT);
+
+        if(key){
+          if(key == 'A'){
+            limT = limT + 1;
+          }else if(key == 'B'){
+            limT = limT - 1;
+          } else if(key == '*'){
+            lcd.clear();
+            menu();
+            conf = false;
+          }
+        }
+      break;
+      case 'H':
+        lcd.setCursor(7,0);
+        lcd.print("Hall");
+        lcd.setCursor(0, 1);
+        lcd.print(limH);
+
+        if(key){
+          if(key == 'A'){
+            limH = limH + 50;
+          }else if(key == 'B'){
+            limH = limH - 50;
+          } else if(key == '*'){
+            lcd.clear();
+            menu();
+            conf = false;
+          }
+        }
+      break;
+      case 'L':
+        lcd.setCursor(7,0);
+        lcd.print("Luz");
+        lcd.setCursor(0, 1);
+        lcd.print(limL);
+
+        if(key){
+          if(key == 'A'){
+            limL = limL + 50;
+          }else if(key == 'B'){
+            limL = limL - 50;
+          } else if(key == '*'){
+            lcd.clear();
+            menu();
+            conf = false;
+          }
+        }
+      break;
+    }
+  }
+}
+void menu(){
+  digitalWrite(ledRed, 0);
+  digitalWrite(ledGreen, 0);
+  digitalWrite(ledBlue, 0);
+
+  printMenu();
+  selectOp();
 }
 void outputA(){
 	Serial.println("A   B   C   D   E   F");
@@ -430,8 +560,9 @@ void outputB(){
 	Serial.println("A   B   C   D   E   F");
 	Serial.println("    X                ");
 	Serial.println();
-  menuConfig(); //TODO
+  lcd.clear();
   while(band){
+    menu();
     botonHandler(SC);
   }
 }
@@ -471,9 +602,9 @@ void outputE(){
   alarmLcd();
   while(band){
     contTo(4, SC);
-    botonHandler(SA);
     songAlarm();
     blinkLed(ledBlue, 800);
+    botonHandler(SA);
   }
 }
 void outputF(){
