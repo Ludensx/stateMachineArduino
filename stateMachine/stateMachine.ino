@@ -1,6 +1,9 @@
 #include <StateMachineLib.h>
 #include <LiquidCrystal.h>
 #include <Keypad.h>
+#include <dht.h>
+
+dht DHT;
 
 String pass = "1234";
 String contra = "";
@@ -39,6 +42,8 @@ unsigned long previousMillis = 0;
 bool isPlaying = false;
 
 unsigned long previousLedMillis = 0;
+unsigned long prevAmb = 0;
+unsigned long prevEv = 0;
 unsigned long prev = 0;
 //Led parpadeo
 unsigned long startMillis = 0;
@@ -46,9 +51,11 @@ const long interval = 500; // Intervalo de parpadeo del LED en milisegundos
 bool ledState = false; // Estado actual del LED
 
 const int btn = 6;
-const int ledRed = 10;
-const int ledGreen = 9;
-const int ledBlue = 8;
+const int ledRed = 53;
+const int ledGreen = 51;
+const int ledBlue = 49;
+
+const int ldr = A0, hallP = A1, dhtP = 8;//Sensores
 
 const byte ROWS = 4; 
 const byte COLS = 4; 
@@ -159,8 +166,7 @@ void loop()
 	stateMachine.Update();
 }
 
-int readInput()
-{
+int readInput(){
 	Input currentInput = Input::unknown;
 	if (Serial.available())
 	{
@@ -182,6 +188,9 @@ int readInput()
 }
 void seguridad(){
   seguridadB=true;
+  contra="";
+  contE=0;
+  cont = 0;
   while(seguridadB){
   digitalWrite(ledRed, 0);
   digitalWrite(ledGreen, 0);
@@ -210,12 +219,10 @@ void verificar(String contra){
   if (contra==pass){
     Serial.println("Correcto");
     lcd.print("Correcta");
-    digitalWrite(ledGreen, 255);
     stateMachine.SetState(SB, true, true);
     cont = 0;
     seguridadB=false;
   }else if(cont > 1){
-    digitalWrite(ledRed, 255);
     Serial.println("Bloqueado");
     lcd.print("Bloqueado");
     cont = 0;
@@ -227,11 +234,9 @@ void verificar(String contra){
     digitalWrite(ledBlue, 255);
     cont++;
   }
-  contE=0;
 }
-void song() {
+void song(){
   unsigned long currentMillis = millis();
-  
   if (thisNote < notes * 2) {
     if (!isPlaying) {
       int divider = melody[thisNote + 1];
@@ -269,14 +274,14 @@ void blinkLed() {
     ledState = !ledState;
   }
 }
-void contTo(int lim){
+void contTo(int lim, enum State estado){
   unsigned long curr = millis();
   if(curr - prev >= 1000){
     prev = curr;
     Serial.println(contWait++);
   }
   if(contWait>=lim){
-    stateMachine.SetState(SA, true, true);
+    stateMachine.SetState(estado, true, true);
     band=false;
   }
 
@@ -296,13 +301,62 @@ void menuConfig(){
   lcd.setCursor(0, 0);
   lcd.print("Config--B");
 }
+void readTemp(){
+  Serial.print("Temp: ");
+  Serial.println(DHT.temperature);
+  lcd.setCursor(0, 0);
+  lcd.print("T:");
+  lcd.setCursor(2, 0);
+  lcd.print(DHT.temperature);
+}
+void readHum(){
+  Serial.print("Hum: ");
+  Serial.println(DHT.humidity);
+  lcd.setCursor(8, 0);
+  lcd.print("Hm:");
+  lcd.setCursor(11, 0);
+  lcd.print(DHT.humidity);
+}
+void readLdr(){
+  Serial.print("ldr: ");
+  Serial.println(analogRead(ldr));
+  lcd.setCursor(4, 1);
+  lcd.print("Luz:");
+  lcd.setCursor(8, 1);
+  lcd.print(analogRead(ldr));
+}
+void readHall(){
+  Serial.print("hall: ");
+  Serial.println(analogRead(hallP));
+  lcd.setCursor(4, 0);
+  lcd.print("Hall:");
+  lcd.setCursor(9, 0);
+  lcd.print(analogRead(hallP));
+}
 void monitorAmbiental(){
   digitalWrite(ledRed, 0);
   digitalWrite(ledGreen, 0);
   digitalWrite(ledBlue, 0);
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Ambiente--C");
+  unsigned long currAmb = millis();
+  if(currAmb - prevAmb >= 500){
+    prevAmb = currAmb;
+    int chk = DHT.read11(dhtP);
+    lcd.clear();
+    readTemp();
+    readHum();
+    readLdr();
+  }
+}
+void monitorEventos(){
+  digitalWrite(ledRed, 0);
+  digitalWrite(ledGreen, 0);
+  digitalWrite(ledBlue, 0);
+  unsigned long currEv = millis();
+  if(currEv - prevEv >= 500){
+    prevEv = currEv;
+    lcd.clear();
+    readHall();
+  }
 }
 void outputA()
 {
@@ -311,8 +365,7 @@ void outputA()
 	Serial.println();
   seguridad();
 }
-void outputB()
-{
+void outputB(){
   band = true;
 	Serial.println("A   B   C   D   E   F");
 	Serial.println("    X                ");
@@ -325,42 +378,50 @@ void outputB()
     }
   }
 }
-
-void outputC()
-{
+void outputC(){
   band = true;
+  contWait = 0;
 	Serial.println("A   B   C   D   E   F");
 	Serial.println("        X    ");
 	Serial.println();
-  monitorAmbiental(); //TODO
   while(band){
-    botonHandler();
     if(!band){
       stateMachine.SetState(SB, true, true);
     }
+    monitorAmbiental();
+    botonHandler();
+    contTo(7, SF);
   }
 }
-
-void outputD()
-{
+void outputD(){
+  contWait = 0;
+  thisNote = 0;
 	Serial.println("A   B   C   D   E   F");
 	Serial.println("            X");
 	Serial.println();
   while(band){
-    contTo(10);
+    contTo(10, SA);
     song();
     blinkLed();
   }
 }
-void outputE()
-{
+void outputE(){
 	Serial.println("A   B   C   D   E   F");
 	Serial.println("                X");
 	Serial.println();
 }
-void outputF()
-{
+void outputF(){
+  band = true;
+  contWait = 0;
 	Serial.println("A   B   C   D   E   F");
 	Serial.println("                    X");
 	Serial.println();
+  while(band){
+    if(!band){
+      stateMachine.SetState(SB, true, true);
+    }
+    monitorEventos();
+    botonHandler();
+    contTo(3, SC);
+  }
 }
